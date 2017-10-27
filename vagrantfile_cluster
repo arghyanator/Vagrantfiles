@@ -1,0 +1,156 @@
+VAGRANTFILE_API_VERSION = "2"
+$script = <<SCRIPT
+sudo sed -i '/chefserver/d' /etc/hosts
+sudo apt-get -y install nethogs
+sudo apt-get -y update
+sudo apt-get -y upgrade
+cd /tmp
+sudo dpkg -i /vagrant/chef-server-core_12.0.1-1_amd64.deb
+sleep 20
+sudo chef-server-ctl reconfigure
+sleep 30
+sudo chef-server-ctl install opscode-manage --path /vagrant
+sleep 20
+sudo opscode-manage-ctl reconfigure
+sleep 20
+sudo chef-server-ctl reconfigure
+sleep 20
+sudo reboot
+SCRIPT
+$script2 = <<SCRIPT2
+sudo apt-get -y install nethogs
+sudo apt-get -y update
+sudo apt-get -y upgrade
+sudo reboot
+SCRIPT2
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "trusty64"
+  config.trigger.after [:provision, :up, :reload] do
+      system('echo "
+      pass in proto tcp from any to any port 8774
+      pass in proto tcp from any to any port 9292
+      pass in proto tcp from any to any port 9696
+      pass in proto tcp from any to any port 6080
+      pass in proto tcp from any to any port 35357
+      pass in proto tcp from any to any port 5000
+      " | sudo pfctl -f - > /dev/null 2>&1; echo "==> Opening Ports: 3306 for MySQL, 35357 for Keystone Admin, 5000 for Keystone Non-Admin, 8774 for Nova-API, 9292 for Glance, 9696 for Neutron API, 6080 for VNC, 8775 for Nova Metadata API"')  
+  end
+  config.trigger.after [:halt, :destroy] do
+      system("sudo pfctl -f /etc/pf.conf > /dev/null 2>&1; echo '==> Removing Open OpenStack Ports'")
+  end
+  config.vm.synced_folder ".", "/vagrant", id: "vagrant-root", disabled: true
+  
+  config.vm.define "chefserver" do |chefserver|
+	chefserver.vm.hostname = "chefserver"
+	chefserver.vm.provision "shell", inline: $script
+        # chefserver.vm.network "private_network", ip: "10.x.x.x"
+        # chefserver.vm.network "public_network", bridge: 'en0: Wi-Fi (AirPort)' #<== In case you want to bridge with the Wifi card instead of Gigabit card
+        chefserver.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+	chefserver.vm.provider "virtualbox" do |v|
+		v.customize ["modifyvm", :id, "--memory", "2048"]
+		v.customize ["modifyvm", :id, "--cpus", "2"]
+		v.customize ["modifyvm", :id, "--ioapic", "on"]
+		v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+		v.gui = true
+	end
+  end
+  config.vm.define "vbmysql1" do |vbmysql1|
+  vbmysql1.vm.hostname = "vbmysql1"
+  vbmysql1.vm.provision "shell", inline: $script2
+        vbmysql1.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        vbmysql1.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "vbmysql2" do |vbmysql2|
+  vbmysql2.vm.hostname = "vbmysql2"
+  vbmysql2.vm.provision "shell", inline: $script2
+        vbmysql2.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        vbmysql2.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "extraip" do |extraip|
+  extraip.vm.hostname = "extraip"
+  extraip.vm.provision "shell", inline: $script2
+        extraip.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        extraip.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        extraip.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "1024"]
+          v.customize ["modifyvm", :id, "--cpus", "1"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "haproxy1" do |haproxy1|
+  haproxy1.vm.hostname = "haproxy1"
+  haproxy1.vm.provision "shell", inline: $script2
+        haproxy1.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        haproxy1.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "haproxy2" do |haproxy2|
+  haproxy2.vm.hostname = "haproxy2"
+  haproxy2.vm.provision "shell", inline: $script2
+        haproxy2.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        haproxy2.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "controller1" do |controller1|
+  controller1.vm.hostname = "controller1"
+  controller1.vm.provision "shell", inline: $script2
+        controller1.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        controller1.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "controller2" do |controller2|
+  controller2.vm.hostname = "controller2"
+  controller2.vm.provision "shell", inline: $script2
+        controller2.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        controller2.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+  config.vm.define "neutron1" do |neutron1|
+  neutron1.vm.hostname = "neutron1"
+  neutron1.vm.provision "shell", inline: $script2
+        neutron1.vm.network "public_network", bridge: 'en4: AX88179 USB 3.0 to Gigabit Ethernet'
+        neutron1.vm.network "private_network", ip: "192.x.x.x", virtualbox_intnet: "vboxnet0"
+        neutron1.vm.network "private_network", ip: "10.x.x.x", virtualbox_intnet: "vboxnet1"
+        neutron1.vm.provider "virtualbox" do |v|
+          v.customize ["modifyvm", :id, "--memory", "2048"]
+          v.customize ["modifyvm", :id, "--cpus", "2"]
+          v.customize ["modifyvm", :id, "--ioapic", "on"]
+          v.customize ["modifyvm", :id, "--ostype", "Ubuntu_64"]
+          v.gui = true
+        end
+  end
+end
